@@ -427,19 +427,22 @@ struct MIPS_Architecture
 		//so R type instructions are add,sub,
 		//mul,beq,bne,slt,j,lw,sw,addi
 
-		if(!id.empty()) 
+		if(!id_stage.empty()) 
 		{
 			int counter_id_stage=id_stage.front();
 			vector<string> ins=commands[counter_id_stage];
 			if(ins[0]=="add" || ins[0]=="sub" || ins[0]=="mul")
 			{
+				//R type instructions
 				if(!RegWrite || ((RegWrite) && (ins[1]!=regwrite) && (ins[2]!=regwrite)))
 				{
 					data1=registers[registerMap[ins[1]]];
 					data2=registers[registerMap[ins[2]]];
-					
-				}	
+					id_stage.pop();
+				}
+				//else the ID stage is stuck at the instruction commands[counter_id_stage]	
 			}
+
 		}
 
 
