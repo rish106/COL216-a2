@@ -366,6 +366,15 @@ struct MIPS_Architecture
 		file.close();
 	}
 
+	//function written by us
+	pair<string,int> LoadAndStore(string location)
+	{
+		int lparen = location.find('('), offset = stoi(lparen == 0 ? "0" : location.substr(0, lparen));
+		std::string reg = location.substr(lparen + 1);
+		reg.pop_back();
+		return (reg,offset);
+	}
+
 	// execute the commands sequentially (no pipelining)
 	// void executeCommandsUnpipelined()
 	// {
@@ -411,52 +420,70 @@ struct MIPS_Architecture
 		bool MemRead=false;
 		bool MemtoReg=false;
 
-		queue<int> wb_stage;
-		queue<int> mem_stage;
-		queue<int> alu_stage;
-		queue<int> id_stage;
-		queue<int> if_stage;
+		queue<int> wb_stage,mem_stage,alu_stage,id_stage,if_stage;
 
 		int data1,data2; //this will store the data values obtained after the ID stage for a R-type instruction
-		
+		string FunctionForALU; //this denotes what function
+		//the ALU would require to perform
+		int shamt;
+		string SourceRegister;
+		string DestinationRegister;
 
-
-		//this is the ID stage
-		//the first entry of ins contains what needs to be executed
-
-		//so R type instructions are add,sub,
-		//mul,beq,bne,slt,j,lw,sw,addi
-
-		if(!id_stage.empty()) 
+		while(true)
 		{
-			int counter_id_stage=id_stage.front();
-			vector<string> ins=commands[counter_id_stage];
-			if(ins[0]=="add" || ins[0]=="sub" || ins[0]=="mul")
+			//this is the ID stage
+			//the first entry of ins contains what needs to be executed
+
+			//so R type instructions are add,sub,
+			//mul,beq,bne,slt,j,lw,sw,addi
+			if(!id_stage.empty()) 
 			{
-				//R type instructions
-				if(!RegWrite || ((RegWrite) && (ins[1]!=regwrite) && (ins[2]!=regwrite)))
+				int counter_id_stage=id_stage.front();
+				vector<string> ins=commands[counter_id_stage];
+				if((ins[0]=="add") || (ins[0]=="sub") || (ins[0]=="mul") || (ins[0]=="slt"))
 				{
-					data1=registers[registerMap[ins[1]]];
-					data2=registers[registerMap[ins[2]]];
-					id_stage.pop();
+					//R type instructions : add,sub,mul
+					if(!RegWrite || ((RegWrite) && (ins[2]!=regwrite) && (ins[3]!=regwrite)))
+					{
+						data1=registers[registerMap[ins[2]]];
+						data2=registers[registerMap[ins[3]]];
+						FunctionForALU=ins[0];
+						id_stage.pop(); //ID stage of this instruction is done
+						alu_stage.push(counter_id_stage); //Prepare it for ALU stage
+					}
+					//else the ID stage is stuck at the instruction commands[counter_id_stage]
 				}
-				//else the ID stage is stuck at the instruction commands[counter_id_stage]	
+				else if((ins[0]=="addi"))
+				{
+					if(!RegWrite || ((RegWrite) && (ins[2]!=RegWrite)))
+					{
+						shamt=stoi(ins[3]);
+						SourceRegister=registerMap[ins[2]];
+						FunctionForALU=ins[0];
+						id_stage.pop();
+						alu_stage.push(counter_id_stage);
+					}
+					//else do nothing, this instruction would remain at addi only
+				}
+				else if((ins[0]=="lw") || (ins[0]=="sw"))
+				{
+						
+				}
 			}
 
+
+			//this is the IF stage
+			//the MUX in the IF stage is implemented as an if else statement
+			if(! PCSrc) PCcurr=PCnext;
+			else 
+			{
+				PCcurr=PCnew;
+				PCSrc=false;
+			}		
+			if_stage.push(PCcurr);
+			//pass ins to the the IF/ID stage
+			PCnext=PCcurr+1;
 		}
-
-
-		//this is the IF stage
-		//the MUX in the IF stage is implemented as an if else statement
-		if(! PCSrc) PCcurr=PCnext;
-		else 
-		{
-			PCcurr=PCnew;
-			PCSrc=false;
-		}		
-		if_stage.push(PCcurr);
-		//pass ins to the the IF/ID stage
-		PCnext=PCcurr+4;
 	}
 
 	// print the register data in hexadecimal
