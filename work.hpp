@@ -46,6 +46,7 @@ void PassLatchValues(Latch* latchnext,Latch* latchprev)
 	latchnext->ALUtoMem=latchprev->ALUtoMem;
 	latchnext->Branch=latchprev->Branch;
 	latchnext->TakeBranch=latchprev->TakeBranch;
+	latchnext->destregister=latchprev->destregister;
 }
 
 struct MIPS_Architecture
@@ -453,7 +454,6 @@ struct MIPS_Architecture
 		Latch idalu;
 
 		int clockCycles=0;
-		vector<pair<int,int>> modifiedMemory;
 		int FinalCount=0;
 
 		int PCnew=0;
@@ -476,6 +476,7 @@ struct MIPS_Architecture
 		while(true)
 		{
 
+			vector<pair<int,int>> modifiedMemory;
 			//IF final count is = Extra Cycles then break the while loop
 
 			//THIS IS THE WB STAGE
@@ -500,8 +501,10 @@ struct MIPS_Architecture
 			//Implementing the branch control unit
 			if(alumem.TakeBranch==1) 
 			{
+				PCnew=addresult;
 				PCSrc=true;
 				HaltPC=false;
+				addresult=-1;
 			}
 			alumem.TakeBranch=2; //reinitialising TakeBranch
 
@@ -567,17 +570,21 @@ struct MIPS_Architecture
 				}
 				alumem.ALUtoMem=1;
 			}
-			else if((idalu.ALUOp==5) || (idalu.ALUOp==6))
+			else if((idalu.ALUOp==5))
 			{
 				aluresult=aluinput1+aluinput2;
 				alumem.ALUtoMem=1;
 			}
-			else if(idalu.ALUOp==7)
+			else if((idalu.ALUOp==6))
+			{
+				aluresult=aluinput1+aluinput2;
+			}
+			else if(idalu.ALUOp==8)
 			{
 				addresult=PCnext+offset;
 				if(aluinput1==aluinput2) alumem.TakeBranch=1;
 			}
-			else if(idalu.ALUOp==8)
+			else if(idalu.ALUOp==9)
 			{
 				addresult=PCnext+offset;
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
@@ -630,11 +637,11 @@ struct MIPS_Architecture
 					//else do nothing, this instruction would remain at addi only
 				}
 
-				else if((ins[0]=="lw") || (ins[0]=="sw"))
+				else if(ins[0]=="lw")
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					if(!(RegWrite[registerMap[temp.first]]))
+					if((!RegWrite[registerMap[temp.first]]))
 					{
 						offset=temp.second;
 						data1=registers[registerMap[temp.first]];
@@ -643,8 +650,25 @@ struct MIPS_Architecture
 						idalu.RegDst=0;
 						idalu.ALUOp=6;
 						idalu.ALUSrc=1;
-						if(ins[0]=="lw") idmem.MemRead=1;
-						else idmem.MemWrite=1;
+						idmem.MemRead=1;
+						id_stage.pop();
+					}
+				}
+
+				else if(ins[0]=="sw")
+				{
+					//need to load in register from memory and load in memory from registers
+					pair<string,int> temp=LoadAndStore(ins[2]);
+					if((!RegWrite[registerMap[temp.first]]) && (!RegWrite[registerMap[ins[1]]]))
+					{
+						offset=temp.second;
+						data1=registers[registerMap[temp.first]];
+						destregister0=registerMap[ins[1]];
+						RegWrite[destregister0]=true;
+						idalu.RegDst=0;
+						idalu.ALUOp=7;
+						idalu.ALUSrc=1;
+						idmem.MemWrite=1;
 						id_stage.pop();
 					}
 				}
@@ -660,8 +684,8 @@ struct MIPS_Architecture
 						data1=registers[registerMap[ins[1]]];
 						data2=registers[registerMap[ins[2]]];
 						HaltPC=true;
-						if(ins[0]=="beq") idalu.ALUOp=7;
-						else idalu.ALUOp=8;
+						if(ins[0]=="beq") idalu.ALUOp=8;
+						else idalu.ALUOp=9;
 						id_stage.pop();
 					}
 				}
