@@ -366,13 +366,13 @@ struct MIPS_Architecture
 		file.close();
 	}
 
-	//function written by us
+	//function written by us to find the offset and source register separately for load and store instructions.
 	pair<string,int> LoadAndStore(string location)
 	{
 		int lparen = location.find('('), offset = stoi(lparen == 0 ? "0" : location.substr(0, lparen));
 		std::string reg = location.substr(lparen + 1);
 		reg.pop_back();
-		return (reg,offset);
+		return {reg,offset};
 	}
 
 	// execute the commands sequentially (no pipelining)
@@ -407,35 +407,47 @@ struct MIPS_Architecture
 	// 	handleExit(SUCCESS, clockCycles);
 	// }
 
+
 	void executeCommandPipelined()
 	{
+		//CONTROL SIGNALS
 		bool PCSrc=false;
 		bool RegWrite=false; //this control signal denotes 
 		string regwrite; //this will store the register in which 
 		//value needs to be written during WB stage
 		bool ALUSrc=false;
-		bool ALUOp=false;
+		bool ALUOp0=false;
+		bool ALUOp1=false;
 		bool RegDst=false;
 		bool MemWrite=false;
 		bool MemRead=false;
 		bool MemtoReg=false;
+		bool Branch=false;
 
 		queue<int> wb_stage,mem_stage,alu_stage,id_stage,if_stage;
 
-		int data1,data2; //this will store the data values obtained after the ID stage for a R-type instruction
-		string FunctionForALU; //this denotes what function
-		//the ALU would require to perform
-		int shamt;
-		string SourceRegister;
-		string DestinationRegister;
+		//ports required in INSTRUCTION DECODE stage
+		int data1,data2;
+		int offset;
+		int destregister0,destregister1;
 
 		while(true)
 		{
-			//this is the ID stage
-			//the first entry of ins contains what needs to be executed
 
-			//so R type instructions are add,sub,
-			//mul,beq,bne,slt,j,lw,sw,addi
+			/************************************************************************************************************************/
+
+			//THIS IS THE ALU STAGE
+
+			if(!alu_stage.empty())
+			{
+				int counter_alu_stage=alu_stage.front();
+
+			}
+
+			/*********************************************************************************************************************/
+
+			//THIS IS THE INSTRUCTION DECODE STAGE.
+
 			if(!id_stage.empty()) 
 			{
 				int counter_id_stage=id_stage.front();
@@ -447,7 +459,10 @@ struct MIPS_Architecture
 					{
 						data1=registers[registerMap[ins[2]]];
 						data2=registers[registerMap[ins[3]]];
-						FunctionForALU=ins[0];
+						destregister1=registerMap[ins[1]];
+						RegDst=true;
+						ALUOp0=false; ALUOp1=true;
+						ALUSrc=true;
 						id_stage.pop(); //ID stage of this instruction is done
 						alu_stage.push(counter_id_stage); //Prepare it for ALU stage
 					}
@@ -455,24 +470,57 @@ struct MIPS_Architecture
 				}
 				else if((ins[0]=="addi"))
 				{
-					if(!RegWrite || ((RegWrite) && (ins[2]!=RegWrite)))
+					if(!RegWrite || ((RegWrite) && (ins[2]!=regWrite)))
 					{
-						shamt=stoi(ins[3]);
-						SourceRegister=registerMap[ins[2]];
-						FunctionForALU=ins[0];
+						offset=stoi(ins[3]);
+						data1=registers[registerMap[ins[2]]];
+						destregister0=registerMap[ins[1]];
+						RegDst=false;
+						ALUSrc=false;
 						id_stage.pop();
 						alu_stage.push(counter_id_stage);
 					}
 					//else do nothing, this instruction would remain at addi only
 				}
+
 				else if((ins[0]=="lw") || (ins[0]=="sw"))
 				{
-						
+					//need to load in register from memory and load in memory from registers
+					pair<string,int> temp=LoadAndStore(ins[2]);
+					if(!RegWrite || ((RegWrite) && (temp.first!=regWrite)))
+					{
+						offset=temp.second;
+						data1=registers[registerMap[temp.first]];
+						destregister0=registerMap[ins[1]];
+						RegDst=false;
+						ALUOp0=false; ALUOp1=false;
+						ALUSrc=false;
+						id_stage.pop();
+						alu_stage.push(counter_id_stage);
+					}
 				}
+
+				else if((ins[0]=="beq") || (ins[0]=="bne"))
+				{
+					if(!RegWrite || ((RegWrite) && (ins[1]!=regWrite) && (ins[2]!=regWrite)))
+					{
+						//here ins[3] is a label
+						//I have been given the memory address to which the label points to
+						//in the field address[ins[3]], I require the offset though
+						offset=address[ins[3]]-PCnext;
+						data1=registers[registerMap[ins[1]]];
+						data2=registers[registerMap[ins[2]]];
+						ALUOp0=true; ALUOp1=false;
+						id_stage.pop();
+						alu_stage.push(counter_id_stage);
+					}
+				}
+				//ID code for j instruction is still left
 			}
+			/**************************************************************************************************************************/
 
+			//THIS IS THE INSTRUCTION FETCH STAGE.
 
-			//this is the IF stage
 			//the MUX in the IF stage is implemented as an if else statement
 			if(! PCSrc) PCcurr=PCnext;
 			else 
@@ -481,8 +529,8 @@ struct MIPS_Architecture
 				PCSrc=false;
 			}		
 			if_stage.push(PCcurr);
-			//pass ins to the the IF/ID stage
 			PCnext=PCcurr+1;
+
 		}
 	}
 
