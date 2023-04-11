@@ -19,7 +19,7 @@ using namespace std;
 
 struct MIPS_Architecture
 {
-	int registers[32] = {0}, PCcurr = 0;
+	int registers[32] = {0}, PCcurr = 0,PCnext=0;
 
 	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, std::string, std::string)>> instructions;
 	std::unordered_map<std::string, int> registerMap, address;
@@ -427,7 +427,7 @@ struct MIPS_Architecture
 		int clockCycles=0;
 		vector<pair<int,int>> modifiedMemory;
 
-		int PCnext=0,PCnew=0;
+		int PCnew=0;
 
 		queue<int> id_stage;
 
