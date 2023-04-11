@@ -558,7 +558,7 @@ struct MIPS_Architecture
 
 			//transferring the contents of idmem to alumem
 			PassLatchValues(&alumem,&idmem);
-			PassLatchValues(&alwb,&idwb);
+			PassLatchValues(&aluwb,&idwb);
 			//Implementing the MUX controlled by RegDst
 			if(idalu.RegDst==1) aluwb.destregister=destregister1;
 			else if(idalu.RegDst==0) aluwb.destregister=destregister0;
@@ -590,20 +590,20 @@ struct MIPS_Architecture
 			}
 			else if(idalu.ALUOp==6)
 			{
-				aluresult=aluinput1+aluinput2;
+				aluresult=(aluinput1+aluinput2)/4;
 			}
 			else if(idalu.ALUOp==7)
 			{
-				aluresult=aluinput1+aluinput2;
+				aluresult=(aluinput1+aluinput2)/4;
 			}
 			else if(idalu.ALUOp==8)
 			{
-				addresult=PCnext+offset;
+				addresult=(PCnext+offset);
 				if(aluinput1==aluinput2) alumem.TakeBranch=1;
 			}
 			else if(idalu.ALUOp==9)
 			{
-				addresult=PCnext+offset;
+				addresult=(PCnext+offset);
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
@@ -617,13 +617,13 @@ struct MIPS_Architecture
 
 			//THIS IS THE ID STAGE.
 
-			if(!id_stage.empty()) 
+			if(!id_stage.empty() && (!HaltPC)) 
 			{
 				int counter_id_stage=id_stage.front();
 				vector<string> ins=commands[counter_id_stage];
 				if((ins[0]=="add") || (ins[0]=="sub") || (ins[0]=="mul") || (ins[0]=="slt"))
 				{
-					//R type instructions : add,sub,mul
+					//R type instructions : add,sub,mul,slt
 					if((!RegWrite[registerMap[ins[2]]]) && (!RegWrite[registerMap[ins[3]]]))
 					{
 						data1=registers[registerMap[ins[2]]];
@@ -683,7 +683,6 @@ struct MIPS_Architecture
 						offset=temp.second;
 						data1=registers[registerMap[temp.first]];
 						destregister0=registerMap[ins[1]];
-						RegWrite[destregister0]=true;
 						idalu.RegDst=0;
 						idalu.ALUOp=7;
 						idalu.ALUSrc=1;
