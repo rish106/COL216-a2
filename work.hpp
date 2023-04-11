@@ -463,6 +463,7 @@ struct MIPS_Architecture
 		bool RegWrite[32]={false};
 		bool HaltPC=false;
 		bool PCSrc=false;
+		bool InstructionRemoved=false;
 
 		Latch idwb,aluwb,memwb;
 		Latch idmem,alumem;
@@ -516,6 +517,7 @@ struct MIPS_Architecture
 				PCnew=addresult;
 				PCSrc=true;
 				HaltPC=false;
+				InstructionRemoved=false;
 				addresult=-1;
 			}
 			alumem.TakeBranch=2; //reinitialising TakeBranch
@@ -617,7 +619,7 @@ struct MIPS_Architecture
 
 			//THIS IS THE ID STAGE.
 
-			if(!id_stage.empty() && (!HaltPC)) 
+			if((!id_stage.empty()) && (!HaltPC)) 
 			{
 				int counter_id_stage=id_stage.front();
 				vector<string> ins=commands[counter_id_stage];
@@ -708,6 +710,14 @@ struct MIPS_Architecture
 					}
 				}
 				//ID code for j instruction is still left
+			}
+			else if(!(id_stage.empty()) && (HaltPC))
+			{
+				if(!InstructionRemoved)
+				{
+					id_stage.pop();
+					InstructionRemoved=true;
+				}
 			}
 			/**************************************************************************************************************************/
 
