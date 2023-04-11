@@ -422,6 +422,7 @@ struct MIPS_Architecture
 		bool RegDst=false;
 		bool MemWrite=false;
 		bool MemRead=false;
+		bool WriteBack=false;
 		bool MemtoReg=false;
 		bool HaltPC=false;
 		bool Branch=false;
@@ -452,16 +453,17 @@ struct MIPS_Architecture
 
 			//THIS IS THE WB STAGE
 
-			if(MemtoReg) registers[destregister]=memdata1;
-			else registers[destregister]=memdata0;
+			if(WriteBack)
+			{
+				if(MemtoReg) registers[destregister]=memdata1;
+				else registers[destregister]=memdata0;
 
-			MemtoReg=false;
-			RegWrite[destregister]=false;
+				MemtoReg=false;
+				RegWrite[destregister]=false;
+			}
 			memdata0=0; memdata1=0;
 			destregister=-1;
-
-			//Condition for exiting the while loop
-			// if(id_stage.empty()) break;
+			WriteBack=false;
 
 			/*************************************************************************************************************************/
 
@@ -479,6 +481,7 @@ struct MIPS_Architecture
 			{
 				//so the memory which needs to be read, its address is the result of ALU
 				memdata1=data[aluresult];
+				WriteBack=true;
 				MemtoReg=true; // the data read from memory now needs 
 				//to be written back to register
 			}
@@ -558,6 +561,7 @@ struct MIPS_Architecture
 						data2=registers[registerMap[ins[3]]];
 						destregister1=registerMap[ins[1]];
 						RegWrite[destregister1]=true;
+						WriteBack=true;
 						RegDst=true;
 						if(ins[0]=="add") ALUOp=1;
 						else if(ins[0]=="sub") ALUOp=2;
@@ -576,6 +580,7 @@ struct MIPS_Architecture
 						data1=registers[registerMap[ins[2]]];
 						destregister0=registerMap[ins[1]];
 						RegWrite[destregister0]=true;
+						WriteBack=true;
 						RegDst=false;
 						ALUOp=5;
 						ALUSrc=true;
