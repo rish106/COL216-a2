@@ -21,21 +21,20 @@ using namespace std;
 
 struct Latch
 {
-	bool ALUSrc=false;
+	int ALUSrc=2;
 	int ALUOp=0;
-	bool RegDst=false;
-	bool MemWrite=false;
-	bool MemRead=false;
-	bool WriteBack=false;
-	bool MemtoReg=false;
-	bool ALUtoMem=false;
-	bool Branch=false;
-	bool TakeBranch=false;
+	int RegDst=2;
+	int MemWrite=2;
+	int MemRead=2;
+	int WriteBack=2;
+	int MemtoReg=2;
+	int ALUtoMem=2;
+	int Branch=2;
+	int TakeBranch=2;
 };
 
 void PassLatchValues(Latch* latchnext,Latch* latchprev)
 {
-	latchnext->PCSrc=latchprev->PCSrc;
 	latchnext->ALUSrc=latchprev->ALUSrc;
 	latchnext->ALUOp=latchprev->ALUOp;
 	latchnext->RegDst=latchprev->RegDst;
@@ -481,57 +480,57 @@ struct MIPS_Architecture
 
 			//THIS IS THE WB STAGE
 
-			if(memwb.WriteBack)
+			if(memwb.WriteBack==1)
 			{
 				if(memwb.MemtoReg) registers[destregister]=memdata1;
 				else registers[destregister]=memdata0;
 
-				memwb.MemtoReg=false;
+				memwb.MemtoReg=2;
 				RegWrite[destregister]=false;
+				destregister=-1;
 			}
 			memdata0=0; memdata1=0;
-			destregister=-1;
-			memwb.WriteBack=false;
+			memwb.WriteBack=2;
 
 			/*************************************************************************************************************************/
 
 			//THIS IS THE MEM STAGE
 
 			//Implementing the branch control unit
-			if(alumem.TakeBranch) 
+			if(alumem.TakeBranch==1) 
 			{
 				PCSrc=true;
 				HaltPC=false;
 			}
-			alumem.TakeBranch=false; //reinitialising TakeBranch
+			alumem.TakeBranch=2; //reinitialising TakeBranch
 
 			//passing the value of ALU/MEM latch to MEM/WB latch
-			if(alumem.ALUtoMem)
+			if(alumem.ALUtoMem==1)
 			{
 				memdata0=aluresult;
-				memwb.WriteBack=true;
+				memwb.WriteBack=1;
 			}
-			alumem.ALUtoMem=false;
+			alumem.ALUtoMem=2;
 
 			//if memory needs to be read
-			if(alumem.MemRead)
+			if(alumem.MemRead==1)
 			{
 				//so the memory which needs to be read, its address is the result of ALU
 				memdata1=data[aluresult];
-				memwb.WriteBack=true;
-				memwb.MemtoReg=true; // the data read from memory now needs 
+				memwb.WriteBack=1;
+				memwb.MemtoReg=1; // the data read from memory now needs 
 				//to be written back to register
 			}
-			alumem.MemRead=false;
+			alumem.MemRead=2;
 
-			if(alumem.MemWrite)
+			if(alumem.MemWrite==1)
 			{
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
 				data[aluresult]=registers[destregister];
 				modifiedMemory.push_back({aluresult,registers[destregister]});
 			}
-			alumem.MemWrite=false;
+			alumem.MemWrite=2;
 
 			/************************************************************************************************************************/
 
@@ -540,14 +539,14 @@ struct MIPS_Architecture
 			//transferring the contents of idmem to alumem
 			PassLatchValues(&alumem,&idmem);
 			//Implementing the MUX controlled by RegDst
-			if(idalu.RegDst) destregister=destregister1;
-			else destregister=destregister0;
-			idalu.RegDst=false; //reinitialise value of RegDst
+			if(idalu.RegDst==1) destregister=destregister1;
+			else if(idalu.RegDst==0) destregister=destregister0;
+			idalu.RegDst=2; //reinitialise value of RegDst
 			//Implementing the MUX controlled by ALUSrc
 			aluinput1=data1;
-			if(idalu.ALUSrc) aluinput2=offset;
-			else aluinput2=data2;
-			idalu.ALUSrc=false; //reinitialise value of ALUSrc
+			if(idalu.ALUSrc==1) aluinput2=offset;
+			else if(idalu.ALUSrc==0) aluinput2=data2;
+			idalu.ALUSrc=2; //reinitialise value of ALUSrc
 			//Implementing the ALU control unit
 			//ALU control unit takes input as ALUOp control signal
 			if(idalu.ALUOp<=4 && idalu.ALUOp>=1)
@@ -561,25 +560,25 @@ struct MIPS_Architecture
 					if(aluinput1<aluinput2) aluresult=1;
 					else aluresult=0;
 				}
-				alumem.ALUtoMem=true;
+				alumem.ALUtoMem=1;
 			}
 			else if((idalu.ALUOp==5) || (idalu.ALUOp==6))
 			{
 				aluresult=aluinput1+aluinput2;
-				alumem.ALUtoMem=true;
+				alumem.ALUtoMem=1;
 			}
 			else if(idalu.ALUOp==7)
 			{
 				addresult=PCnext+offset;
-				if(aluinput1==aluinput2) alumem.TakeBranch=true;
+				if(aluinput1==aluinput2) alumem.TakeBranch=1;
 			}
 			else if(idalu.ALUOp==8)
 			{
 				addresult=PCnext+offset;
-				if(aluinput1!=aluinput2) alumem.TakeBranch=true;
+				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
-			idalu.ALUOp=0; //reinitialise ALUOp
+			idalu.ALUOp=2; //reinitialise ALUOp
 			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
 			destregister0=-1,destregister1=-1; //reinitialise destregister0 and destregister1
 
@@ -600,12 +599,12 @@ struct MIPS_Architecture
 						data2=registers[registerMap[ins[3]]];
 						destregister1=registerMap[ins[1]];
 						RegWrite[destregister1]=true;
-						idalu.RegDst=true;
+						idalu.RegDst=1;
 						if(ins[0]=="add") idalu.ALUOp=1;
 						else if(ins[0]=="sub") idalu.ALUOp=2;
 						else if(ins[0]=="mul") idalu.ALUOp=3;
 						else idalu.ALUOp=4;
-						idalu.ALUSrc=false;
+						idalu.ALUSrc=0;
 						id_stage.pop();
 					}
 					//else the ID stage is stuck at the instruction commands[counter_id_stage]
@@ -618,9 +617,9 @@ struct MIPS_Architecture
 						data1=registers[registerMap[ins[2]]];
 						destregister0=registerMap[ins[1]];
 						RegWrite[destregister0]=true;
-						idalu.RegDst=false;
+						idalu.RegDst=0;
 						idalu.ALUOp=5;
-						idalu.ALUSrc=true;
+						idalu.ALUSrc=1;
 						id_stage.pop();
 					}
 					//else do nothing, this instruction would remain at addi only
@@ -636,11 +635,11 @@ struct MIPS_Architecture
 						data1=registers[registerMap[temp.first]];
 						destregister0=registerMap[ins[1]];
 						RegWrite[destregister0]=true;
-						idalu.RegDst=false;
+						idalu.RegDst=0;
 						idalu.ALUOp=6;
-						idalu.ALUSrc=true;
-						if(ins[0]=="lw") idmem.MemRead=true;
-						else idmem.MemWrite=true;
+						idalu.ALUSrc=1;
+						if(ins[0]=="lw") idmem.MemRead=1;
+						else idmem.MemWrite=1;
 						id_stage.pop();
 					}
 				}
