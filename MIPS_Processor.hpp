@@ -15,6 +15,7 @@
 #include <exception>
 #include <iostream>
 #include <boost/tokenizer.hpp>
+#include<queue>
 
 struct MIPS_Architecture
 {
