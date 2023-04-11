@@ -570,12 +570,16 @@ struct MIPS_Architecture
 				}
 				alumem.ALUtoMem=1;
 			}
-			else if((idalu.ALUOp==5))
+			else if(idalu.ALUOp==5)
 			{
 				aluresult=aluinput1+aluinput2;
 				alumem.ALUtoMem=1;
 			}
-			else if((idalu.ALUOp==6))
+			else if(idalu.ALUOp==6)
+			{
+				aluresult=aluinput1+aluinput2;
+			}
+			else if(idalu.ALUOp==7)
 			{
 				aluresult=aluinput1+aluinput2;
 			}
