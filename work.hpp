@@ -424,10 +424,12 @@ struct MIPS_Architecture
 		bool MemRead=false;
 		bool WriteBack=false;
 		bool MemtoReg=false;
+		bool ALUtoMem=false;
 		bool HaltPC=false;
 		bool Branch=false;
 		int clockCycles=0;
 		vector<pair<int,int>> modifiedMemory;
+		int FinalCount=0;
 
 		int PCnew=0;
 
@@ -450,6 +452,8 @@ struct MIPS_Architecture
 
 		while(true)
 		{
+
+			//IF final count is = Extra Cycles then break the while loop
 
 			//THIS IS THE WB STAGE
 
@@ -474,7 +478,12 @@ struct MIPS_Architecture
 			zero=false; //reinitialising zero 
 
 			//passing the value of ALU/MEM latch to MEM/WB latch
-			memdata0=aluresult;
+			if(ALUtoMem)
+			{
+				memdata0=aluresult;
+				WriteBack=true;
+			}
+			ALUtoMem=false;
 
 			//if memory needs to be read
 			if(MemRead)
@@ -522,10 +531,12 @@ struct MIPS_Architecture
 					if(aluinput1<aluinput2) aluresult=1;
 					else aluresult=0;
 				}
+				ALUtoMem=true;
 			}
 			else if((ALUOp==5) || (ALUOp==6))
 			{
 				aluresult=aluinput1+aluinput2;
+				ALUtoMem=true;
 			}
 			else if(ALUOp==7)
 			{
@@ -649,11 +660,12 @@ struct MIPS_Architecture
 			printRegisters(clockCycles);
 
 			cout<<(int)modifiedMemory.size()<<" ";
-			for(int i=0;i<modifiedMemory.size();i++) cout<<modifiedMemory[i].first<<" "<<modifiedMemory[i].second<<" ";
+			for(int i=0;i<(int)modifiedMemory.size();i++) cout<<modifiedMemory[i].first<<" "<<modifiedMemory[i].second<<" ";
 			cout<<"\n";
 
 			//Condition for exiting the while loop
-			if(id_stage.empty()) break;
+			if(FinalCount==3) break;
+			if(id_stage.empty()) FinalCount++;
 		}
 	}
 
