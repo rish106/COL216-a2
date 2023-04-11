@@ -31,6 +31,7 @@ struct Latch
 	int ALUtoMem=2;
 	int Branch=2;
 	int TakeBranch=2;
+	int destregister=-1;
 };
 
 void PassLatchValues(Latch* latchnext,Latch* latchprev)
@@ -465,7 +466,6 @@ struct MIPS_Architecture
 		int destregister0=-1,destregister1=-1;
 
 		//ports required in ALU stage
-		int destregister=-1;
 		int aluinput1=0,aluinput2=0;
 		int aluresult=0;
 		int addresult=0;
@@ -482,12 +482,12 @@ struct MIPS_Architecture
 
 			if(memwb.WriteBack==1)
 			{
-				if(memwb.MemtoReg) registers[destregister]=memdata1;
-				else registers[destregister]=memdata0;
+				if(memwb.MemtoReg==1) registers[memwb.destregister]=memdata1;
+				else registers[memwb.destregister]=memdata0;
 
 				memwb.MemtoReg=2;
-				RegWrite[destregister]=false;
-				destregister=-1;
+				RegWrite[memwb.destregister]=false;
+				memwb.destregister=-1;
 			}
 			memdata0=0; memdata1=0;
 			memwb.WriteBack=2;
@@ -495,6 +495,7 @@ struct MIPS_Architecture
 			/*************************************************************************************************************************/
 
 			//THIS IS THE MEM STAGE
+			PassLatchValues(&memwb,&aluwb);
 
 			//Implementing the branch control unit
 			if(alumem.TakeBranch==1) 
@@ -509,6 +510,7 @@ struct MIPS_Architecture
 			{
 				memdata0=aluresult;
 				memwb.WriteBack=1;
+				aluresult=-1;
 			}
 			alumem.ALUtoMem=2;
 
@@ -520,6 +522,7 @@ struct MIPS_Architecture
 				memwb.WriteBack=1;
 				memwb.MemtoReg=1; // the data read from memory now needs 
 				//to be written back to register
+				aluresult=-1;
 			}
 			alumem.MemRead=2;
 
@@ -527,8 +530,10 @@ struct MIPS_Architecture
 			{
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
-				data[aluresult]=registers[destregister];
-				modifiedMemory.push_back({aluresult,registers[destregister]});
+				data[aluresult]=registers[aluwb.destregister];
+				modifiedMemory.push_back({aluresult,registers[aluwb.destregister]});
+				aluresult=-1;
+				aluwb.destregister=-1;
 			}
 			alumem.MemWrite=2;
 
@@ -539,8 +544,8 @@ struct MIPS_Architecture
 			//transferring the contents of idmem to alumem
 			PassLatchValues(&alumem,&idmem);
 			//Implementing the MUX controlled by RegDst
-			if(idalu.RegDst==1) destregister=destregister1;
-			else if(idalu.RegDst==0) destregister=destregister0;
+			if(idalu.RegDst==1) aluwb.destregister=destregister1;
+			else if(idalu.RegDst==0) aluwb.destregister=destregister0;
 			idalu.RegDst=2; //reinitialise value of RegDst
 			//Implementing the MUX controlled by ALUSrc
 			aluinput1=data1;
@@ -578,7 +583,7 @@ struct MIPS_Architecture
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
-			idalu.ALUOp=2; //reinitialise ALUOp
+			idalu.ALUOp=0; //reinitialise ALUOp
 			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
 			destregister0=-1,destregister1=-1; //reinitialise destregister0 and destregister1
 
