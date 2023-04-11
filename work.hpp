@@ -410,14 +410,15 @@ struct MIPS_Architecture
 
 	void executeCommandPipelined()
 	{
+		//The logic of the below code is based on the Figure 4.51 of the book Computer Organization and Design Edition 5
+
 		//CONTROL SIGNALS
 		bool PCSrc=false;
 		bool RegWrite=false; //this control signal denotes 
 		string regwrite; //this will store the register in which 
 		//value needs to be written during WB stage
 		bool ALUSrc=false;
-		bool ALUOp0=false;
-		bool ALUOp1=false;
+		int ALUOp=0;
 		bool RegDst=false;
 		bool MemWrite=false;
 		bool MemRead=false;
@@ -427,22 +428,74 @@ struct MIPS_Architecture
 		queue<int> wb_stage,mem_stage,alu_stage,id_stage,if_stage;
 
 		//ports required in INSTRUCTION DECODE stage
-		int data1,data2;
-		int offset;
-		int destregister0,destregister1;
+		int data1=0,data2=0;
+		int offset=0;
+		int destregister0=-1,destregister1=-1;
+		string rtype=""; //this will function as an opcode for R-type instruction
 
+		//ports required in ALU stage
+		int destregister=-1;
+		int aluinput1=0,aluinput2=0;
+		int aluresult=0;
+		int addresult=0;
+		bool zero=false;
 		while(true)
 		{
+			/*************************************************************************************************************************/
+
+			//THIS IS THE MEM STAGE
+
+			//Implementing the branch control unit
+			if(zero) PCSrc=true;
+			zero=false; //reinitializing zero
 
 			/************************************************************************************************************************/
 
 			//THIS IS THE ALU STAGE
 
-			if(!alu_stage.empty())
+			//Implementing the MUX controlled by RegDst
+			if(RegDst) destregister=destregister1;
+			else destregister=destregister0;
+			//Implementing the MUX controlled by ALUSrc
+			aluinput1=data1;
+			if(ALUSrc) aluinput2=offset;
+			else aluinput2=data2;
+			//Implementing the ALU control unit
+			//ALU control unit takes input as the opcode and the ALUOp control signals
+			if(ALUOp<=4)
 			{
-				int counter_alu_stage=alu_stage.front();
-
+				//so now the instruction is R type and we now check the value of rtype to get the actual instruction
+				if(ALUOp==1) aluresult=aluinput1+aluinput2;
+				else if(ALUOp==2) aluresult=aluinput1-aluinput2;
+				else if(ALUOp==3) aluresult=aluinput1*aluinput2;
+				else
+				{
+					if(aluinput1<aluinput2) aluresult=1;
+					else aluresult=0;
+				}
 			}
+			else if((ALUOp==5) || (ALUOp==6))
+			{
+				aluresult=aluinput1+aluinput2;
+			}
+			else if(ALUOp==7)
+			{
+				addresult=PCnext+offset;
+				if(aluinput1==aluinput2) zero=true;
+				else zero=false;
+			}
+			else if(ALUOp==8)
+			{
+				addresult=PCnext+offset;
+				if(aluinput1!=aluinput2) zero=true;
+				else zero=false;
+			}
+
+			//reinitializing the variables that wont be used further
+			ALUOp=0;
+			aluinput1=0,aluinput2=0;
+			destregister0=-1,destregister1=-1;
+			RegDst=false; ALUSrc=false;
 
 			/*********************************************************************************************************************/
 
@@ -460,9 +513,13 @@ struct MIPS_Architecture
 						data1=registers[registerMap[ins[2]]];
 						data2=registers[registerMap[ins[3]]];
 						destregister1=registerMap[ins[1]];
+						rtype=ins[0];
 						RegDst=true;
-						ALUOp0=false; ALUOp1=true;
-						ALUSrc=true;
+						if(ins[0]=="add") ALUOp=1;
+						else if(ins[0]=="sub") ALUOp=2;
+						else if(ins[0]=="mul") ALUOp=3;
+						else ALUOp=4;
+						ALUSrc=false;
 						id_stage.pop(); //ID stage of this instruction is done
 						alu_stage.push(counter_id_stage); //Prepare it for ALU stage
 					}
@@ -476,7 +533,8 @@ struct MIPS_Architecture
 						data1=registers[registerMap[ins[2]]];
 						destregister0=registerMap[ins[1]];
 						RegDst=false;
-						ALUSrc=false;
+						ALUOp=5;
+						ALUSrc=true;
 						id_stage.pop();
 						alu_stage.push(counter_id_stage);
 					}
@@ -493,8 +551,14 @@ struct MIPS_Architecture
 						data1=registers[registerMap[temp.first]];
 						destregister0=registerMap[ins[1]];
 						RegDst=false;
-						ALUOp0=false; ALUOp1=false;
-						ALUSrc=false;
+						ALUOp=6;
+						ALUSrc=true;
+						if(ins[0]=="lw") 
+						{
+							MemRead=true;
+							MemtoReg=true;
+						}
+						else MemWrite=true;
 						id_stage.pop();
 						alu_stage.push(counter_id_stage);
 					}
@@ -507,10 +571,12 @@ struct MIPS_Architecture
 						//here ins[3] is a label
 						//I have been given the memory address to which the label points to
 						//in the field address[ins[3]], I require the offset though
-						offset=address[ins[3]]-PCnext;
+						offset=address[ins[3]]-PCnext; //so that PCnext+offset becomes equal to address[ins[3]]
 						data1=registers[registerMap[ins[1]]];
 						data2=registers[registerMap[ins[2]]];
-						ALUOp0=true; ALUOp1=false;
+						if(ins[0]=="beq") ALUOp=7;
+						else ALUOp=8;
+						ALUSrc=false;
 						id_stage.pop();
 						alu_stage.push(counter_id_stage);
 					}
@@ -522,15 +588,11 @@ struct MIPS_Architecture
 			//THIS IS THE INSTRUCTION FETCH STAGE.
 
 			//the MUX in the IF stage is implemented as an if else statement
-			if(! PCSrc) PCcurr=PCnext;
-			else 
-			{
-				PCcurr=PCnew;
-				PCSrc=false;
-			}		
+			if(PCSrc) PCcurr=Pcnew;
+			else PCcurr=PCnext;
+			PCSrc=false;	
 			if_stage.push(PCcurr);
 			PCnext=PCcurr+1;
-
 		}
 	}
 
