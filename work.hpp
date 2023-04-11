@@ -19,7 +19,8 @@ using namespace std;
 
 struct MIPS_Architecture
 {
-	int registers[32] = {0}, PCcurr = 0, PCnext,PCnew;
+	int registers[32] = {0}, PCcurr = 0;
+
 	std::unordered_map<std::string, std::function<int(MIPS_Architecture &, std::string, std::string, std::string)>> instructions;
 	std::unordered_map<std::string, int> registerMap, address;
 	static const int MAX = (1 << 20);
@@ -414,24 +415,26 @@ struct MIPS_Architecture
 
 		//CONTROL SIGNALS
 		bool PCSrc=false;
-		bool RegWrite=false; //this control signal denotes 
-		string regwrite; //this will store the register in which 
-		//value needs to be written during WB stage
+		bool RegWrite[32]={false};
 		bool ALUSrc=false;
 		int ALUOp=0;
 		bool RegDst=false;
 		bool MemWrite=false;
 		bool MemRead=false;
 		bool MemtoReg=false;
+		bool HaltPC=false;
 		bool Branch=false;
+		int clockCycles=0;
+		vector<pair<int,int>> modifiedMemory;
 
-		queue<int> wb_stage,mem_stage,alu_stage,id_stage,if_stage;
+		int PCnext=0,PCnew=0;
+
+		queue<int> id_stage;
 
 		//ports required in INSTRUCTION DECODE stage
 		int data1=0,data2=0;
 		int offset=0;
 		int destregister0=-1,destregister1=-1;
-		string rtype=""; //this will function as an opcode for R-type instruction
 
 		//ports required in ALU stage
 		int destregister=-1;
@@ -439,15 +442,55 @@ struct MIPS_Architecture
 		int aluresult=0;
 		int addresult=0;
 		bool zero=false;
+
+		//ports required in MEM stage
+		int memdata0=0,memdata1=0;
+
 		while(true)
 		{
+
+			//THIS IS THE WB STAGE
+
+			if(MemtoReg) registers[destregister]=memdata1;
+			else registers[destregister]=memdata0;
+
+			MemtoReg=false;
+			RegWrite[destregister]=false;
+			memdata0=0; memdata1=0;
+			destregister=-1;
+
+			//Condition for exiting the while loop
+			if(id_stage.empty()) break;
+
 			/*************************************************************************************************************************/
 
 			//THIS IS THE MEM STAGE
 
 			//Implementing the branch control unit
 			if(zero) PCSrc=true;
-			zero=false; //reinitializing zero
+			zero=false; //reinitialising zero 
+
+			//passing the value of ALU/MEM latch to MEM/WB latch
+			memdata0=aluresult;
+
+			//if memory needs to be read
+			if(MemRead)
+			{
+				//so the memory which needs to be read, its address is the result of ALU
+				memdata1=data[aluresult];
+				MemtoReg=true; // the data read from memory now needs 
+				//to be written back to register
+			}
+			MemRead=false;
+
+			if(MemWrite)
+			{
+				//so what needs to be read in MemWrite is stored
+				//in the register destregister 
+				data[aluresult]=registers[destregister];
+				modifiedMemory.push_back({aluresult,registers[destregister]});
+			}
+			MemWrite=false;
 
 			/************************************************************************************************************************/
 
@@ -456,12 +499,14 @@ struct MIPS_Architecture
 			//Implementing the MUX controlled by RegDst
 			if(RegDst) destregister=destregister1;
 			else destregister=destregister0;
+			RegDst=false; //reinitialise value of RegDst
 			//Implementing the MUX controlled by ALUSrc
 			aluinput1=data1;
 			if(ALUSrc) aluinput2=offset;
 			else aluinput2=data2;
+			ALUSrc=false; //reinitialise value of ALUSrc
 			//Implementing the ALU control unit
-			//ALU control unit takes input as the opcode and the ALUOp control signals
+			//ALU control unit takes input as ALUOp control signal
 			if(ALUOp<=4)
 			{
 				//so now the instruction is R type and we now check the value of rtype to get the actual instruction
@@ -491,15 +536,13 @@ struct MIPS_Architecture
 				else zero=false;
 			}
 
-			//reinitializing the variables that wont be used further
-			ALUOp=0;
-			aluinput1=0,aluinput2=0;
-			destregister0=-1,destregister1=-1;
-			RegDst=false; ALUSrc=false;
+			ALUOp=0; //reinitialise ALUOp
+			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
+			destregister0=-1,destregister1=-1; //reinitialise destregister0 and destregister1
 
 			/*********************************************************************************************************************/
 
-			//THIS IS THE INSTRUCTION DECODE STAGE.
+			//THIS IS THE ID STAGE.
 
 			if(!id_stage.empty()) 
 			{
@@ -508,35 +551,34 @@ struct MIPS_Architecture
 				if((ins[0]=="add") || (ins[0]=="sub") || (ins[0]=="mul") || (ins[0]=="slt"))
 				{
 					//R type instructions : add,sub,mul
-					if(!RegWrite || ((RegWrite) && (ins[2]!=regwrite) && (ins[3]!=regwrite)))
+					if((!RegWrite[registerMap[ins[2]]]) && (!RegWrite[registerMap[ins[3]]]))
 					{
 						data1=registers[registerMap[ins[2]]];
 						data2=registers[registerMap[ins[3]]];
 						destregister1=registerMap[ins[1]];
-						rtype=ins[0];
+						RegWrite[destregister1]=true;
 						RegDst=true;
 						if(ins[0]=="add") ALUOp=1;
 						else if(ins[0]=="sub") ALUOp=2;
 						else if(ins[0]=="mul") ALUOp=3;
 						else ALUOp=4;
 						ALUSrc=false;
-						id_stage.pop(); //ID stage of this instruction is done
-						alu_stage.push(counter_id_stage); //Prepare it for ALU stage
+						id_stage.pop();
 					}
 					//else the ID stage is stuck at the instruction commands[counter_id_stage]
 				}
 				else if((ins[0]=="addi"))
 				{
-					if(!RegWrite || ((RegWrite) && (ins[2]!=regWrite)))
+					if(!RegWrite[registerMap[ins[2]]])
 					{
 						offset=stoi(ins[3]);
 						data1=registers[registerMap[ins[2]]];
 						destregister0=registerMap[ins[1]];
+						RegWrite[destregister0]=true;
 						RegDst=false;
 						ALUOp=5;
 						ALUSrc=true;
 						id_stage.pop();
-						alu_stage.push(counter_id_stage);
 					}
 					//else do nothing, this instruction would remain at addi only
 				}
@@ -545,28 +587,24 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					if(!RegWrite || ((RegWrite) && (temp.first!=regWrite)))
+					if(!(RegWrite[registerMap[temp.first]]))
 					{
 						offset=temp.second;
 						data1=registers[registerMap[temp.first]];
 						destregister0=registerMap[ins[1]];
+						RegWrite[destregister0]=true;
 						RegDst=false;
 						ALUOp=6;
 						ALUSrc=true;
-						if(ins[0]=="lw") 
-						{
-							MemRead=true;
-							MemtoReg=true;
-						}
+						if(ins[0]=="lw") MemRead=true;
 						else MemWrite=true;
 						id_stage.pop();
-						alu_stage.push(counter_id_stage);
 					}
 				}
 
 				else if((ins[0]=="beq") || (ins[0]=="bne"))
 				{
-					if(!RegWrite || ((RegWrite) && (ins[1]!=regWrite) && (ins[2]!=regWrite)))
+					if(!(RegWrite[registerMap[ins[1]]]) && !(RegWrite[registerMap[ins[2]]]))
 					{
 						//here ins[3] is a label
 						//I have been given the memory address to which the label points to
@@ -574,25 +612,39 @@ struct MIPS_Architecture
 						offset=address[ins[3]]-PCnext; //so that PCnext+offset becomes equal to address[ins[3]]
 						data1=registers[registerMap[ins[1]]];
 						data2=registers[registerMap[ins[2]]];
+						HaltPC=true;
 						if(ins[0]=="beq") ALUOp=7;
 						else ALUOp=8;
-						ALUSrc=false;
 						id_stage.pop();
-						alu_stage.push(counter_id_stage);
 					}
 				}
 				//ID code for j instruction is still left
 			}
 			/**************************************************************************************************************************/
 
-			//THIS IS THE INSTRUCTION FETCH STAGE.
+			//THIS IS THE IF STAGE.
 
-			//the MUX in the IF stage is implemented as an if else statement
-			if(PCSrc) PCcurr=Pcnew;
-			else PCcurr=PCnext;
-			PCSrc=false;	
-			if_stage.push(PCcurr);
-			PCnext=PCcurr+1;
+			//deciding the address of the next instruction to be executed
+			if(PCSrc) 
+			{
+				PCcurr=PCnew;
+				PCSrc=false;
+			}
+			else if(!HaltPC) PCcurr=PCnext;	
+			if((!HaltPC) && (PCcurr<(int)commands.size())) 
+			{
+				id_stage.push(PCcurr);
+				PCnext=PCcurr+1;
+			}
+
+			clockCycles++;
+
+			//outputting values
+			printRegisters(clockCycles);
+
+			cout<<(int)modifiedMemory.size()<<" ";
+			for(int i=0;i<modifiedMemory.size();i++) cout<<modifiedMemory[i].first<<" "<<modifiedMemory[i].second<<" ";
+			cout<<"\n";
 		}
 	}
 
