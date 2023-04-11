@@ -14,6 +14,7 @@
 #include <fstream>
 #include <exception>
 #include <iostream>
+#include <queue>
 #include <boost/tokenizer.hpp>
 using namespace std;
 
@@ -460,7 +461,7 @@ struct MIPS_Architecture
 			destregister=-1;
 
 			//Condition for exiting the while loop
-			if(id_stage.empty()) break;
+			// if(id_stage.empty()) break;
 
 			/*************************************************************************************************************************/
 
@@ -645,6 +646,9 @@ struct MIPS_Architecture
 			cout<<(int)modifiedMemory.size()<<" ";
 			for(int i=0;i<modifiedMemory.size();i++) cout<<modifiedMemory[i].first<<" "<<modifiedMemory[i].second<<" ";
 			cout<<"\n";
+
+			//Condition for exiting the while loop
+			if(id_stage.empty()) break;
 		}
 	}
 
