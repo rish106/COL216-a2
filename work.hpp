@@ -49,6 +49,21 @@ void PassLatchValues(Latch* latchnext,Latch* latchprev)
 	latchnext->destregister=latchprev->destregister;
 }
 
+void ClearLatchValues(Latch* L)
+{
+	L->ALUSrc=2;
+	L->ALUOp=0;
+	L->RegDst=2;
+	L->MemWrite=2;
+	L->MemRead=2;
+	L->WriteBack=2;
+	L->MemtoReg=2;
+	L->ALUtoMem=2;
+	L->Branch=2;
+	L->TakeBranch=2;
+	L->destregister=-1;
+}
+
 struct MIPS_Architecture
 {
 	int registers[32] = {0}, PCcurr = 0,PCnext=0;
@@ -485,13 +500,10 @@ struct MIPS_Architecture
 			{
 				if(memwb.MemtoReg==1) registers[memwb.destregister]=memdata1;
 				else registers[memwb.destregister]=memdata0;
-
-				memwb.MemtoReg=2;
 				RegWrite[memwb.destregister]=false;
-				memwb.destregister=-1;
 			}
+			ClearLatchValues(&memwb);
 			memdata0=0; memdata1=0;
-			memwb.WriteBack=2;
 
 			/*************************************************************************************************************************/
 
@@ -527,18 +539,18 @@ struct MIPS_Architecture
 				//to be written back to register
 				aluresult=-1;
 			}
-			alumem.MemRead=2;
 
 			if(alumem.MemWrite==1)
 			{
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
 				data[aluresult]=registers[aluwb.destregister];
-				modifiedMemory.push_back({aluresult,registers[aluwb.destregister]});
+				modifiedMemory.push_back({aluresult,data[aluresult]});
 				aluresult=-1;
-				aluwb.destregister=-1;
 			}
-			alumem.MemWrite=2;
+
+			ClearLatchValues(&aluwb);
+			ClearLatchValues(&alumem);
 
 			/************************************************************************************************************************/
 
@@ -546,6 +558,7 @@ struct MIPS_Architecture
 
 			//transferring the contents of idmem to alumem
 			PassLatchValues(&alumem,&idmem);
+			PassLatchValues(&alwb,&idwb);
 			//Implementing the MUX controlled by RegDst
 			if(idalu.RegDst==1) aluwb.destregister=destregister1;
 			else if(idalu.RegDst==0) aluwb.destregister=destregister0;
@@ -594,7 +607,9 @@ struct MIPS_Architecture
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
-			idalu.ALUOp=0; //reinitialise ALUOp
+			ClearLatchValues(&idalu);
+			ClearLatchValues(&idmem);
+			ClearLatchValues(&idwb);
 			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
 			destregister0=-1,destregister1=-1; //reinitialise destregister0 and destregister1
 
