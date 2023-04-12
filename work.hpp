@@ -15,6 +15,7 @@
 #include <exception>
 #include <iostream>
 #include <queue>
+#include<map>
 #include <boost/tokenizer.hpp>
 using namespace std;
 
@@ -683,18 +684,21 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					int memoryaddress=locateAddress(ins[2]);
-					if((!RegWrite[registerMap[temp.first]]) && (MemoryWrite[memoryaddress]==0))
+					if(!RegWrite[registerMap[temp.first]])
 					{
-						idalu.offset=temp.second;
-						idalu.data1=registers[registerMap[temp.first]];
-						idalu.destregister0=registerMap[ins[1]];
-						RegWrite[idalu.destregister0]=true;
-						idalu.RegDst=0;
-						idalu.ALUOp=6;
-						idalu.ALUSrc=1;
-						idmem.MemRead=1;
-						id_stage.pop();
+						int memoryaddress=registers[registerMap[temp.first]]+temp.second;
+						if(MemoryWrite[memoryaddress]==0)
+						{
+							idalu.offset=temp.second;
+							idalu.data1=registers[registerMap[temp.first]];
+							idalu.destregister0=registerMap[ins[1]];
+							RegWrite[idalu.destregister0]=true;
+							idalu.RegDst=0;
+							idalu.ALUOp=6;
+							idalu.ALUSrc=1;
+							idmem.MemRead=1;
+							id_stage.pop();
+						}
 					}
 				}
 
@@ -702,7 +706,6 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					int memoryaddress=locateAddress(ins[2]);
 					if((!RegWrite[registerMap[temp.first]]) && (!RegWrite[registerMap[ins[1]]]))
 					{
 						idalu.offset=temp.second;
@@ -712,6 +715,7 @@ struct MIPS_Architecture
 						idalu.ALUOp=7;
 						idalu.ALUSrc=1;
 						idmem.MemWrite=1;
+						int memoryaddress=registers[registerMap[temp.first]]+temp.second;
 						MemoryWrite[memoryaddress]=1;
 						id_stage.pop();
 					}
