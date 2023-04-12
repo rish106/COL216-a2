@@ -531,6 +531,12 @@ struct MIPS_Architecture
 				while(!id_stage.empty()) id_stage.pop();
 				HaltPC=false;
 			}
+			else if(alumem.TakeBranch==0)
+			{
+				PCSrc=false;
+				HaltPC=false;
+			}
+
 
 			//passing the value of ALU/MEM latch to MEM/WB latch
 			if(alumem.ALUtoMem==1)
@@ -607,17 +613,18 @@ struct MIPS_Architecture
 			{
 				alumem.addresult=idalu.destaddress;
 				if(aluinput1==aluinput2) alumem.TakeBranch=1;
+				else if(aluinput1!=aluinput2) alumem.TakeBranch=0;
 			}
 			else if(idalu.ALUOp==9)
 			{
 				alumem.addresult=idalu.destaddress;
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
+				else if(aluinput1==aluinput2) alumem.TakeBranch=0;
 			}
 
 			ClearLatchValues(&idalu);
 			ClearLatchValues(&idmem);
 			ClearLatchValues(&idwb);
-			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
 
 			/*********************************************************************************************************************/
 
@@ -725,8 +732,8 @@ struct MIPS_Architecture
 				PCcurr=PCnew;
 				PCSrc=false;
 			}
-			else if(!HaltPC) PCcurr=PCnext;	
-			if((!HaltPC) && (PCcurr<(int)commands.size())) 
+			else PCcurr=PCnext;	
+			if((PCcurr<(int)commands.size())) 
 			{
 				id_stage.push(PCcurr);
 				PCnext=PCcurr+1;
