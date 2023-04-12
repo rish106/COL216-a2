@@ -37,6 +37,7 @@ struct Latch
 	int offset=0;
 	int aluresult=0;
 	int addresult=0;
+	int memdata0=0,memdata1=0;
 };
 
 void PassLatchValues(Latch* latchnext,Latch* latchprev)
@@ -57,6 +58,7 @@ void PassLatchValues(Latch* latchnext,Latch* latchprev)
 	latchnext->offset=latchprev->offset;
 	latchnext->aluresult=latchprev->aluresult;
 	latchnext->addresult=latchprev->addresult;
+	latchnext->memdata0=latchprev->memdata0; latchnext->memdata1=latchprev->memdata1;
 }
 
 void ClearLatchValues(Latch* L)
@@ -72,6 +74,12 @@ void ClearLatchValues(Latch* L)
 	L->Branch=2;
 	L->TakeBranch=2;
 	L->destregister=-1;
+	L->destregister0=-1; L->destregister1=-1;
+	L->data1=0; L->data2=0;
+	L->offset=0;
+	L->aluresult=0;
+	L->addresult=0;
+	L->memdata0=0; L->memdata1=0;
 }
 
 struct MIPS_Architecture
@@ -515,7 +523,7 @@ struct MIPS_Architecture
 			//Implementing the branch control unit
 			if(alumem.TakeBranch==1) 
 			{
-				PCnew=addresult;
+				PCnew=alumem.addresult;
 				PCSrc=true;
 				while(!id_stage.empty()) id_stage.pop();
 				HaltPC=false;
