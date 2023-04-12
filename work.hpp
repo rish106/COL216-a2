@@ -482,6 +482,7 @@ struct MIPS_Architecture
 		//The logic of the below code is based on the Figure 4.51 of the book Computer Organization and Design Edition 5
 
 		bool RegWrite[32]={false};
+		map<int,int> MemoryWrite;
 		bool HaltPC=false;
 		int PCSrc=2;
 
@@ -569,6 +570,7 @@ struct MIPS_Architecture
 				//in the register destregister 
 				memwb.WriteBack=0;
 				data[alumem.aluresult]=registers[aluwb.destregister];
+				MemoryWrite[alumem.aluresult]=0;
 				modifiedMemory.push_back({alumem.aluresult,data[alumem.aluresult]});
 			}
 
@@ -681,7 +683,8 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					if((!RegWrite[registerMap[temp.first]]))
+					int memoryaddress=locateAddress(ins[2]);
+					if((!RegWrite[registerMap[temp.first]]) && (MemoryWrite[memoryaddress]==0))
 					{
 						idalu.offset=temp.second;
 						idalu.data1=registers[registerMap[temp.first]];
@@ -699,6 +702,7 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
+					int memoryaddress=locateAddress(ins[2]);
 					if((!RegWrite[registerMap[temp.first]]) && (!RegWrite[registerMap[ins[1]]]))
 					{
 						idalu.offset=temp.second;
@@ -708,6 +712,7 @@ struct MIPS_Architecture
 						idalu.ALUOp=7;
 						idalu.ALUSrc=1;
 						idmem.MemWrite=1;
+						MemoryWrite[memoryaddress]=1;
 						id_stage.pop();
 					}
 				}
