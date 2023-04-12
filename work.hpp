@@ -686,7 +686,7 @@ struct MIPS_Architecture
 					pair<string,int> temp=LoadAndStore(ins[2]);
 					if(!RegWrite[registerMap[temp.first]])
 					{
-						int memoryaddress=registers[registerMap[temp.first]]+temp.second;
+						int memoryaddress=(registers[registerMap[temp.first]]+temp.second)/4;
 						if(MemoryWrite[memoryaddress]==0)
 						{
 							idalu.offset=temp.second;
@@ -715,7 +715,7 @@ struct MIPS_Architecture
 						idalu.ALUOp=7;
 						idalu.ALUSrc=1;
 						idmem.MemWrite=1;
-						int memoryaddress=registers[registerMap[temp.first]]+temp.second;
+						int memoryaddress=(registers[registerMap[temp.first]]+temp.second)/4;
 						MemoryWrite[memoryaddress]=1;
 						id_stage.pop();
 					}
