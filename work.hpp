@@ -34,6 +34,7 @@ struct Latch
 	int destregister=-1;
 	int destregister0=-1,destregister1=-1;
 	int data1=0,data2=0;
+	int destaddress=-1;
 	int offset=0;
 	int aluresult=0;
 	int addresult=0;
@@ -55,6 +56,7 @@ void PassLatchValues(Latch* latchnext,Latch* latchprev)
 	latchnext->destregister=latchprev->destregister;
 	latchnext->destregister0=latchprev->destregister0; latchnext->destregister1=latchprev->destregister1;
 	latchnext->data1=latchprev->data1; latchnext->data2=latchprev->data2;
+	latchnext->destaddress=latchprev->destaddress;
 	latchnext->offset=latchprev->offset;
 	latchnext->aluresult=latchprev->aluresult;
 	latchnext->addresult=latchprev->addresult;
@@ -76,6 +78,7 @@ void ClearLatchValues(Latch* L)
 	L->destregister=-1;
 	L->destregister0=-1; L->destregister1=-1;
 	L->data1=0; L->data2=0;
+	L->destaddress=-1;
 	L->offset=0;
 	L->aluresult=0;
 	L->addresult=0;
@@ -602,12 +605,12 @@ struct MIPS_Architecture
 			}
 			else if(idalu.ALUOp==8)
 			{
-				alumem.addresult=(PCnext+idalu.offset);
+				alumem.addresult=idalu.destaddress;
 				if(aluinput1==aluinput2) alumem.TakeBranch=1;
 			}
 			else if(idalu.ALUOp==9)
 			{
-				alumem.addresult=(PCnext+idalu.offset);
+				alumem.addresult=idalu.destaddress;
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
@@ -701,7 +704,7 @@ struct MIPS_Architecture
 						//here ins[3] is a label
 						//I have been given the memory address to which the label points to
 						//in the field address[ins[3]], I require the offset though
-						idalu.offset=address[ins[3]]-PCnext; //so that PCnext+offset becomes equal to address[ins[3]]
+						idalu.destaddress=address[ins[3]]; //so that PCnext+offset becomes equal to address[ins[3]]
 						idalu.data1=registers[registerMap[ins[1]]];
 						idalu.data2=registers[registerMap[ins[2]]];
 						HaltPC=true;
