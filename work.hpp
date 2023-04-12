@@ -32,6 +32,11 @@ struct Latch
 	int Branch=2;
 	int TakeBranch=2;
 	int destregister=-1;
+	int destregister0=-1,destregister1=-1;
+	int data1=0,data2=0;
+	int offset=0;
+	int aluresult=0;
+	int addresult=0;
 };
 
 void PassLatchValues(Latch* latchnext,Latch* latchprev)
@@ -47,6 +52,11 @@ void PassLatchValues(Latch* latchnext,Latch* latchprev)
 	latchnext->Branch=latchprev->Branch;
 	latchnext->TakeBranch=latchprev->TakeBranch;
 	latchnext->destregister=latchprev->destregister;
+	latchnext->destregister0=latchprev->destregister0; latchnext->destregister1=latchprev->destregister1;
+	latchnext->data1=latchprev->data1; latchnext->data2=latchprev->data2;
+	latchnext->offset=latchprev->offset;
+	latchnext->aluresult=latchprev->aluresult;
+	latchnext->addresult=latchprev->addresult;
 }
 
 void ClearLatchValues(Latch* L)
@@ -463,7 +473,6 @@ struct MIPS_Architecture
 		bool RegWrite[32]={false};
 		bool HaltPC=false;
 		bool PCSrc=false;
-		bool InstructionRemoved=false;
 
 		Latch idwb,aluwb,memwb;
 		Latch idmem,alumem;
@@ -476,36 +485,28 @@ struct MIPS_Architecture
 
 		queue<int> id_stage;
 
-		//ports required in INSTRUCTION DECODE stage
-		int data1=0,data2=0;
-		int offset=0;
-		int destregister0=-1,destregister1=-1;
-
-		//ports required in ALU stage
-		int aluinput1=0,aluinput2=0;
-		int aluresult=0;
-		int addresult=0;
-
-		//ports required in MEM stage
-		int memdata0=0,memdata1=0;
-
 		while(true)
 		{
 
 			vector<pair<int,int>> modifiedMemory;
-			//IF final count is = Extra Cycles then break the while loop
+			//IF final count is = 3 then break the while loop
 
 			//THIS IS THE WB STAGE
 
 			if(memwb.WriteBack==1)
 			{
-				if(memwb.MemtoReg==1) registers[memwb.destregister]=memdata1;
-				else registers[memwb.destregister]=memdata0;
-				RegWrite[memwb.destregister]=false;
+				if(memwb.MemtoReg==1) 
+				{
+					registers[memwb.destregister]=memwb.memdata1;
+					RegWrite[memwb.destregister]=false;
+				}
+				else if(memwb.MemtoReg==0) 
+				{
+					registers[memwb.destregister]=memwb.memdata0;
+					RegWrite[memwb.destregister]=false;
+				}
 			}
 			ClearLatchValues(&memwb);
-			memdata0=0; memdata1=0;
-
 			/*************************************************************************************************************************/
 
 			//THIS IS THE MEM STAGE
@@ -516,39 +517,34 @@ struct MIPS_Architecture
 			{
 				PCnew=addresult;
 				PCSrc=true;
+				while(!id_stage.empty()) id_stage.pop();
 				HaltPC=false;
-				InstructionRemoved=false;
-				addresult=-1;
 			}
-			alumem.TakeBranch=2; //reinitialising TakeBranch
 
 			//passing the value of ALU/MEM latch to MEM/WB latch
 			if(alumem.ALUtoMem==1)
 			{
-				memdata0=aluresult;
+				memwb.memdata0=alumem.aluresult;
 				memwb.WriteBack=1;
-				aluresult=-1;
+				memwb.MemtoReg=0;
 			}
-			alumem.ALUtoMem=2;
 
 			//if memory needs to be read
 			if(alumem.MemRead==1)
 			{
 				//so the memory which needs to be read, its address is the result of ALU
-				memdata1=data[aluresult];
+				memwb.memdata1=data[alumem.aluresult];
 				memwb.WriteBack=1;
 				memwb.MemtoReg=1; // the data read from memory now needs 
 				//to be written back to register
-				aluresult=-1;
 			}
 
 			if(alumem.MemWrite==1)
 			{
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
-				data[aluresult]=registers[aluwb.destregister];
-				modifiedMemory.push_back({aluresult,data[aluresult]});
-				aluresult=-1;
+				data[alumem.aluresult]=registers[aluwb.destregister];
+				modifiedMemory.push_back({alumem.aluresult,data[alumem.aluresult]});
 			}
 
 			ClearLatchValues(&aluwb);
@@ -557,55 +553,53 @@ struct MIPS_Architecture
 			/************************************************************************************************************************/
 
 			//THIS IS THE ALU STAGE
-
+			int aluinput1=0,aluinput2=0;
 			//transferring the contents of idmem to alumem
 			PassLatchValues(&alumem,&idmem);
 			PassLatchValues(&aluwb,&idwb);
 			//Implementing the MUX controlled by RegDst
-			if(idalu.RegDst==1) aluwb.destregister=destregister1;
-			else if(idalu.RegDst==0) aluwb.destregister=destregister0;
-			idalu.RegDst=2; //reinitialise value of RegDst
+			if(idalu.RegDst==1) aluwb.destregister=idalu.destregister1;
+			else if(idalu.RegDst==0) aluwb.destregister=idalu.destregister0;
 			//Implementing the MUX controlled by ALUSrc
-			aluinput1=data1;
-			if(idalu.ALUSrc==1) aluinput2=offset;
-			else if(idalu.ALUSrc==0) aluinput2=data2;
-			idalu.ALUSrc=2; //reinitialise value of ALUSrc
+			aluinput1=idalu.data1;
+			if(idalu.ALUSrc==1) aluinput2=idalu.offset;
+			else if(idalu.ALUSrc==0) aluinput2=idalu.data2;
 			//Implementing the ALU control unit
 			//ALU control unit takes input as ALUOp control signal
 			if(idalu.ALUOp<=4 && idalu.ALUOp>=1)
 			{
 				//so now the instruction is R type and we now check the value of rtype to get the actual instruction
-				if(idalu.ALUOp==1) aluresult=aluinput1+aluinput2;
-				else if(idalu.ALUOp==2) aluresult=aluinput1-aluinput2;
-				else if(idalu.ALUOp==3) aluresult=aluinput1*aluinput2;
+				if(idalu.ALUOp==1) alumem.aluresult=aluinput1+aluinput2;
+				else if(idalu.ALUOp==2) alumem.aluresult=aluinput1-aluinput2;
+				else if(idalu.ALUOp==3) alumem.aluresult=aluinput1*aluinput2;
 				else
 				{
-					if(aluinput1<aluinput2) aluresult=1;
-					else aluresult=0;
+					if(aluinput1<aluinput2) alumem.aluresult=1;
+					else alumem.aluresult=0;
 				}
 				alumem.ALUtoMem=1;
 			}
 			else if(idalu.ALUOp==5)
 			{
-				aluresult=aluinput1+aluinput2;
+				alumem.aluresult=aluinput1+aluinput2;
 				alumem.ALUtoMem=1;
 			}
 			else if(idalu.ALUOp==6)
 			{
-				aluresult=(aluinput1+aluinput2)/4;
+				alumem.aluresult=(aluinput1+aluinput2)/4;
 			}
 			else if(idalu.ALUOp==7)
 			{
-				aluresult=(aluinput1+aluinput2)/4;
+				alumem.aluresult=(aluinput1+aluinput2)/4;
 			}
 			else if(idalu.ALUOp==8)
 			{
-				addresult=(PCnext+offset);
+				alumem.addresult=(PCnext+idalu.offset);
 				if(aluinput1==aluinput2) alumem.TakeBranch=1;
 			}
 			else if(idalu.ALUOp==9)
 			{
-				addresult=(PCnext+offset);
+				alumem.addresult=(PCnext+idalu.offset);
 				if(aluinput1!=aluinput2) alumem.TakeBranch=1;
 			}
 
@@ -613,7 +607,6 @@ struct MIPS_Architecture
 			ClearLatchValues(&idmem);
 			ClearLatchValues(&idwb);
 			aluinput1=0,aluinput2=0; //reinitialise aluinput1 and aluinput2
-			destregister0=-1,destregister1=-1; //reinitialise destregister0 and destregister1
 
 			/*********************************************************************************************************************/
 
@@ -628,10 +621,10 @@ struct MIPS_Architecture
 					//R type instructions : add,sub,mul,slt
 					if((!RegWrite[registerMap[ins[2]]]) && (!RegWrite[registerMap[ins[3]]]))
 					{
-						data1=registers[registerMap[ins[2]]];
-						data2=registers[registerMap[ins[3]]];
-						destregister1=registerMap[ins[1]];
-						RegWrite[destregister1]=true;
+						idalu.data1=registers[registerMap[ins[2]]];
+						idalu.data2=registers[registerMap[ins[3]]];
+						idalu.destregister1=registerMap[ins[1]];
+						RegWrite[idalu.destregister1]=true;
 						idalu.RegDst=1;
 						if(ins[0]=="add") idalu.ALUOp=1;
 						else if(ins[0]=="sub") idalu.ALUOp=2;
@@ -646,10 +639,10 @@ struct MIPS_Architecture
 				{
 					if(!RegWrite[registerMap[ins[2]]])
 					{
-						offset=stoi(ins[3]);
-						data1=registers[registerMap[ins[2]]];
-						destregister0=registerMap[ins[1]];
-						RegWrite[destregister0]=true;
+						idalu.offset=stoi(ins[3]);
+						idalu.data1=registers[registerMap[ins[2]]];
+						idalu.destregister0=registerMap[ins[1]];
+						RegWrite[idalu.destregister0]=true;
 						idalu.RegDst=0;
 						idalu.ALUOp=5;
 						idalu.ALUSrc=1;
@@ -664,10 +657,10 @@ struct MIPS_Architecture
 					pair<string,int> temp=LoadAndStore(ins[2]);
 					if((!RegWrite[registerMap[temp.first]]))
 					{
-						offset=temp.second;
-						data1=registers[registerMap[temp.first]];
-						destregister0=registerMap[ins[1]];
-						RegWrite[destregister0]=true;
+						idalu.offset=temp.second;
+						idalu.data1=registers[registerMap[temp.first]];
+						idalu.destregister0=registerMap[ins[1]];
+						RegWrite[idalu.destregister0]=true;
 						idalu.RegDst=0;
 						idalu.ALUOp=6;
 						idalu.ALUSrc=1;
@@ -682,9 +675,9 @@ struct MIPS_Architecture
 					pair<string,int> temp=LoadAndStore(ins[2]);
 					if((!RegWrite[registerMap[temp.first]]) && (!RegWrite[registerMap[ins[1]]]))
 					{
-						offset=temp.second;
-						data1=registers[registerMap[temp.first]];
-						destregister0=registerMap[ins[1]];
+						idalu.offset=temp.second;
+						idalu.data1=registers[registerMap[temp.first]];
+						idalu.destregister0=registerMap[ins[1]];
 						idalu.RegDst=0;
 						idalu.ALUOp=7;
 						idalu.ALUSrc=1;
@@ -700,9 +693,9 @@ struct MIPS_Architecture
 						//here ins[3] is a label
 						//I have been given the memory address to which the label points to
 						//in the field address[ins[3]], I require the offset though
-						offset=address[ins[3]]-PCnext; //so that PCnext+offset becomes equal to address[ins[3]]
-						data1=registers[registerMap[ins[1]]];
-						data2=registers[registerMap[ins[2]]];
+						idalu.offset=address[ins[3]]-PCnext; //so that PCnext+offset becomes equal to address[ins[3]]
+						idalu.data1=registers[registerMap[ins[1]]];
+						idalu.data2=registers[registerMap[ins[2]]];
 						HaltPC=true;
 						if(ins[0]=="beq") idalu.ALUOp=8;
 						else idalu.ALUOp=9;
@@ -710,14 +703,6 @@ struct MIPS_Architecture
 					}
 				}
 				//ID code for j instruction is still left
-			}
-			else if(!(id_stage.empty()) && (HaltPC))
-			{
-				if(!InstructionRemoved)
-				{
-					id_stage.pop();
-					InstructionRemoved=true;
-				}
 			}
 			/**************************************************************************************************************************/
 
