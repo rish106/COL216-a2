@@ -483,7 +483,7 @@ struct MIPS_Architecture
 
 		bool RegWrite[32]={false};
 		bool HaltPC=false;
-		bool PCSrc=false;
+		int PCSrc=2;
 
 		Latch idwb,aluwb,memwb;
 		Latch idmem,alumem;
@@ -495,6 +495,7 @@ struct MIPS_Architecture
 		int PCnew=0;
 
 		queue<int> id_stage;
+		queue<int> temp_id_stage;
 
 		while(true)
 		{
@@ -527,13 +528,19 @@ struct MIPS_Architecture
 			if(alumem.TakeBranch==1) 
 			{
 				PCnew=alumem.addresult;
-				PCSrc=true;
-				while(!id_stage.empty()) id_stage.pop();
+				PCSrc=1;
+				while(!(id_stage.empty())) id_stage.pop();
 				HaltPC=false;
 			}
 			else if(alumem.TakeBranch==0)
 			{
-				PCSrc=false;
+				PCSrc=0;
+				//pass the accumulated program counters to a temporary queue
+				while(!(id_stage.empty()))
+				{
+					temp_id_stage.push(id_stage.front());
+					id_stage.pop();
+				}
 				HaltPC=false;
 			}
 
@@ -560,6 +567,7 @@ struct MIPS_Architecture
 			{
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
+				memwb.WriteBack=0;
 				data[alumem.aluresult]=registers[aluwb.destregister];
 				modifiedMemory.push_back({alumem.aluresult,data[alumem.aluresult]});
 			}
@@ -589,10 +597,10 @@ struct MIPS_Architecture
 				if(idalu.ALUOp==1) alumem.aluresult=aluinput1+aluinput2;
 				else if(idalu.ALUOp==2) alumem.aluresult=aluinput1-aluinput2;
 				else if(idalu.ALUOp==3) alumem.aluresult=aluinput1*aluinput2;
-				else
+				else if(idalu.ALUOp==4)
 				{
 					if(aluinput1<aluinput2) alumem.aluresult=1;
-					else alumem.aluresult=0;
+					else if(aluinput1>=aluinput2) alumem.aluresult=0;
 				}
 				alumem.ALUtoMem=1;
 			}
@@ -647,7 +655,7 @@ struct MIPS_Architecture
 						if(ins[0]=="add") idalu.ALUOp=1;
 						else if(ins[0]=="sub") idalu.ALUOp=2;
 						else if(ins[0]=="mul") idalu.ALUOp=3;
-						else idalu.ALUOp=4;
+						else if(ins[0]=="slt") idalu.ALUOp=4;
 						idalu.ALUSrc=0;
 						id_stage.pop();
 					}
@@ -716,7 +724,8 @@ struct MIPS_Architecture
 						idalu.data2=registers[registerMap[ins[2]]];
 						HaltPC=true;
 						if(ins[0]=="beq") idalu.ALUOp=8;
-						else idalu.ALUOp=9;
+						else if(ins[0]=="bne") idalu.ALUOp=9;
+						idalu.ALUSrc=0;
 						id_stage.pop();
 					}
 				}
@@ -727,12 +736,22 @@ struct MIPS_Architecture
 			//THIS IS THE IF STAGE.
 
 			//deciding the address of the next instruction to be executed
-			if(PCSrc) 
+			if(PCSrc==1) 
 			{
 				PCcurr=PCnew;
-				PCSrc=false;
 			}
-			else PCcurr=PCnext;	
+			else if(PCSrc==0)
+			{
+				PCcurr=PCnext;
+				while(!temp_id_stage.empty())
+				{
+					id_stage.push(temp_id_stage.front());
+					temp_id_stage.pop();
+				}
+			}
+			else if(PCSrc==2) PCcurr=PCnext;
+
+			PCSrc=2;	
 			if((PCcurr<(int)commands.size())) 
 			{
 				id_stage.push(PCcurr);
