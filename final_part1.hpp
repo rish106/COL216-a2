@@ -516,7 +516,7 @@ struct MIPS_Architecture
 	{
 		//The logic of the below code is based on the Figure 4.51 of the book Computer Organization and Design Edition 5
 
-		bool RegWrite[32]={false};
+		int RegWrite[32]={0};
 		bool HaltPC=false;
 		int PCSrc=2;
 
@@ -525,7 +525,6 @@ struct MIPS_Architecture
 		Latch idalu;
 
 		int clockCycles=0;
-		int FinalCount=0;
 
 		int PCnew=0;
 
@@ -537,7 +536,6 @@ struct MIPS_Architecture
 		while(true)
 		{
 			vector<pair<int,int>> modifiedMemory;
-			//IF final count is = 3 then break the while loop
 
 			//THIS IS THE WB STAGE
 
@@ -546,12 +544,12 @@ struct MIPS_Architecture
 				if(memwb.MemtoReg==1) 
 				{
 					registers[memwb.destregister]=memwb.memdata1;
-					RegWrite[memwb.destregister]=false;
+					RegWrite[memwb.destregister]--;
 				}
 				else if(memwb.MemtoReg==0) 
 				{
 					registers[memwb.destregister]=memwb.memdata0;
-					RegWrite[memwb.destregister]=false;
+					RegWrite[memwb.destregister]--;
 				}
                 stage_executed = 1;
 			}
@@ -717,7 +715,7 @@ struct MIPS_Architecture
 						idalu.data1=registers[registerMap[ins[2]]];
 						idalu.data2=registers[registerMap[ins[3]]];
 						idalu.destregister1=registerMap[ins[1]];
-						RegWrite[idalu.destregister1]=true;
+						RegWrite[idalu.destregister1]++;
 						idalu.RegDst=1;
 						if(ins[0]=="add") idalu.ALUOp=1;
 						else if(ins[0]=="sub") idalu.ALUOp=2;
@@ -735,7 +733,7 @@ struct MIPS_Architecture
 						idalu.offset=stoi(ins[3]);
 						idalu.data1=registers[registerMap[ins[2]]];
 						idalu.destregister0=registerMap[ins[1]];
-						RegWrite[idalu.destregister0]=true;
+						RegWrite[idalu.destregister0]++;
 						idalu.RegDst=0;
 						idalu.ALUOp=5;
 						idalu.ALUSrc=1;
@@ -753,7 +751,7 @@ struct MIPS_Architecture
 						idalu.offset=temp.second;
 						idalu.data1=registers[registerMap[temp.first]];
 						idalu.destregister0=registerMap[ins[1]];
-						RegWrite[idalu.destregister0]=true;
+						RegWrite[idalu.destregister0]++;
 						idalu.RegDst=0;
 						idalu.ALUOp=6;
 						idalu.ALUSrc=1;
@@ -856,20 +854,13 @@ struct MIPS_Architecture
             stage_executed--;
             if (!stage_executed) break;
 
-            // cout << "finalcount " << FinalCount << '\n';
             // cout << "id_stage size " << id_stage.size() << '\n';
 			// int counter_id_stage=id_stage.front();
 			// vector<string> ins=commands[counter_id_stage];
             // cout << "instruction -> " << ins[0] << ' ' << ins[1] << ' ' << ins[2] << ' ' << ins[3] << '\n';
             // cout << "haltpc " << HaltPC << '\n';
 			// Condition for exiting the while loop
-            // cout << "final count " << FinalCount << '\n';
             // cout << "commands size " << commands.size() << '\n';
-			// if(FinalCount==3) break;
-			// if(id_stage.empty()) {
-   //              cout << "idalu aluop " << idalu.ALUOp << '\n';
-   //              FinalCount++;
-   //          }
 		}
 	}
 
