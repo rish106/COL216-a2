@@ -868,13 +868,13 @@ struct MIPS_Architecture
             // cout << "stage executed " << stage_executed << '\n';
             stage_executed--;
             if (!stage_executed) break;
-            cout << TempRegWrite[2] << '\n';
-            if (clockCycles == 10) break;
+            // cout << TempRegWrite[2] << '\n';
+            // if (clockCycles == 10) break;
 
-            cout << "id_stage size " << id_stage.size() << '\n';
-			int counter_id_stage=id_stage.front();
-			vector<string> ins=commands[counter_id_stage];
-            cout << "instruction -> " << ins[0] << ' ' << ins[1] << ' ' << ins[2] << ' ' << ins[3] << '\n';
+            // cout << "id_stage size " << id_stage.size() << '\n';
+			// int counter_id_stage=id_stage.front();
+			// vector<string> ins=commands[counter_id_stage];
+            // cout << "instruction -> " << ins[0] << ' ' << ins[1] << ' ' << ins[2] << ' ' << ins[3] << '\n';
             // cout << "haltpc " << HaltPC << '\n';
             // cout << "commands size " << commands.size() << '\n';
 		}
@@ -883,7 +883,7 @@ struct MIPS_Architecture
 	// print the register data in hexadecimal
 	void printRegisters(int clockCycle)
 	{
-		std::cout << "Cycle number: " << clockCycle << '\n';
+		// std::cout << "Cycle number: " << clockCycle << '\n';
 				  // << std::hex;
 		for (int i = 0; i < 32; ++i)
 			std::cout << registers[i] << ' ';
