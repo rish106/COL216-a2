@@ -611,7 +611,7 @@ struct MIPS_Architecture
 				//so what needs to be read in MemWrite is stored
 				//in the register destregister 
 				memwb.WriteBack=0;
-				data[alumem.aluresult]=registers[aluwb.destregister];
+				data[alumem.aluresult]=Tempregisters[aluwb.destregister];
 				modifiedMemory.push_back({alumem.aluresult,data[alumem.aluresult]});
                 stage_executed = 2;
 			}
@@ -779,7 +779,7 @@ struct MIPS_Architecture
 				{
 					//need to load in register from memory and load in memory from registers
 					pair<string,int> temp=LoadAndStore(ins[2]);
-					if((!TempRegWrite[registerMap[temp.first]]) && (!TempRegWrite[registerMap[ins[1]]]))
+					if((!TempRegWrite[registerMap[temp.first]]))
 					{
 						idalu.offset=temp.second;
 						idalu.data1=Tempregisters[registerMap[temp.first]];
