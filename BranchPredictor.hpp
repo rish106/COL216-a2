@@ -86,66 +86,154 @@ struct SaturatingBHRBranchPredictor : public BranchPredictor {
         assert(size <= (1 << 16));
     }
 
-    bool predict(uint32_t pc) {
-        // your code here
-        int val=(int)(bhr.to_ulong());
+    //STRATEGY 1
+
+    bool predict(uint32_t pc)
+    {
+        //your code here
         uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
-
-        if((bhrTable[val]==bitset<2>(3)) && (table[lsb14]==bitset<2>(3))) return true;
-        else if((bhrTable[val]==bitset<2>(3)) && (table[lsb14]==bitset<2>(2))) return true;
-        else if((bhrTable[val]==bitset<2>(2)) && (table[lsb14]==bitset<2>(3))) return true;
-        else if((bhrTable[val]==bitset<2>(2)) && (table[lsb14]==bitset<2>(2))) return true;
-
-        if(((bhrTable[val]==bitset<2>(0))) && (table[lsb14]==bitset<2>(0))) return false;
-        else if((bhrTable[val]==bitset<2>(0)) && (table[lsb14]==bitset<2>(1))) return false;
-        else if((bhrTable[val]==bitset<2>(1)) && (table[lsb14]==bitset<2>(0))) return false;
-        else if((bhrTable[val]==bitset<2>(0)) && (table[lsb14]==bitset<2>(0))) return false;
-
-        else
-        {
-            int rnd=rand()%2;
-            if(rnd) return true;
-            else return false;
-        }
+        int val=4*((int)lsb14)+(int)(table[lsb14].to_ulong());
+        if(combination[val]==bitset<2>(2) || combination[val]==bitset<2>(3)) return true;
+        else return false;
     }
 
-    void update(uint32_t pc, bool taken) {
-        // your code here
-
+    void update(uint32_t pc,bool taken)
+    {
+        //your code here
         uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
-
+        int val=4*lsb14+(int)(table[lsb14].to_ulong());
         if(taken)
         {
-            if(table[lsb14]==bitset<2>(0)) table[lsb14]=bitset<2>(1);
-            else if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(2);
-            else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(3);
+            if(combination[val]==bitset<2>(0)) combination[val]=bitset<2>(1);
+            else if(combination[val]==bitset<2>(1)) combination[val]=bitset<2>(2);
+            else if(combination[val]==bitset<2>(2)) combination[val]=bitset<2>(3);
         }
         else
         {
-            if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(0);
-            else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(1);
-            else if(table[lsb14]==bitset<2>(3)) table[lsb14]=bitset<2>(2);
+            if(combination[val]==bitset<2>(1)) combination[val]=bitset<2>(0);
+            else if(combination[val]==bitset<2>(2)) combination[val]=bitset<2>(1);
+            else if(combination[val]==bitset<2>(3)) combination[val]=bitset<2>(2);
         }
-
-        int val=(int)(bhr.to_ulong());
-
-        if(taken)
-        {
-            if(bhrTable[val]==bitset<2>(0)) bhrTable[val]=bitset<2>(1);
-            else if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(2);
-            else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(3);
-        }
-        else
-        {
-            if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(0);
-            else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(1);
-            else if(bhrTable[val]==bitset<2>(3)) bhrTable[val]=bitset<2>(2);
-        }
-        val=val%2;
-        val=val*2;
-        if(taken) val+=1;
-        bhr=bitset<2>(val);
+        
+        int num=(int)(table[lsb14].to_ulong());
+        num=num%2;
+        num=num*2;
+        if(taken) num+=1;
+        table[lsb14]=bitset<2>(num);
     }
+
+    // STRATEGY 2
+
+    // bool predict(uint32_t pc) {
+    //     // your code here
+    //     int val=(int)(bhr.to_ulong());
+    //     uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
+
+    //     if(((bhrTable[val]==bitset<2>(3)) || (bhrTable[val]==bitset<2>(2))) && ((table[lsb14]==bitset<2>(3)) || (table[lsb14]==bitset<2>(2)))) return true;
+    //     else if(((bhrTable[val]==bitset<2>(0)) || (bhrTable[val]==bitset<2>(1))) && ((table[lsb14]==bitset<2>(0)) || (table[lsb14]==bitset<2>(1)))) return false;
+    //     else
+    //     {
+    //         int rnd=rand()%2;
+    //         if(rnd) return true;
+    //         else return false;
+    //     }
+    // }
+
+    // void update(uint32_t pc, bool taken) {
+    //     // your code here
+
+    //     uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
+
+    //     if(taken)
+    //     {
+    //         if(table[lsb14]==bitset<2>(0)) table[lsb14]=bitset<2>(1);
+    //         else if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(2);
+    //         else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(3);
+    //     }
+    //     else
+    //     {
+    //         if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(0);
+    //         else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(1);
+    //         else if(table[lsb14]==bitset<2>(3)) table[lsb14]=bitset<2>(2);
+    //     }
+
+    //     int val=(int)(bhr.to_ulong());
+
+    //     if(taken)
+    //     {
+    //         if(bhrTable[val]==bitset<2>(0)) bhrTable[val]=bitset<2>(1);
+    //         else if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(2);
+    //         else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(3);
+    //     }
+    //     else
+    //     {
+    //         if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(0);
+    //         else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(1);
+    //         else if(bhrTable[val]==bitset<2>(3)) bhrTable[val]=bitset<2>(2);
+    //     }
+    //     val=val%2;
+    //     val=val*2;
+    //     if(taken) val+=1;
+    //     bhr=bitset<2>(val);
+    // }
+
+    //STRATEGY 3
+
+    // bool predict(uint32_t pc)
+    // {
+    //     //your code here
+    //     int val=(int)(bhr.to_ulong());
+    //     uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
+
+    //     if((bhrTable[val]==bitset<2>(3)) || (table[lsb14]==bitset<2>(3))) return true;
+    //     else if((bhrTable[val]==bitset<2>(0)) || (table[lsb14]==bitset<2>(0))) return false;
+    //     else
+    //     {
+    //         int rnd=rand()%2;
+    //         if(rnd) return true;
+    //         else return false;
+    //     }
+    // }
+
+    // void update(uint32_t pc,bool taken)
+    // {
+    //     //your code here
+    //     uint32_t lsb14=(pc & (uint32_t)((1<<14)-1));
+
+    //     if(taken)
+    //     {
+    //         if(table[lsb14]==bitset<2>(0)) table[lsb14]=bitset<2>(1);
+    //         else if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(2);
+    //         else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(3);
+    //     }
+    //     else
+    //     {
+    //         if(table[lsb14]==bitset<2>(1)) table[lsb14]=bitset<2>(0);
+    //         else if(table[lsb14]==bitset<2>(2)) table[lsb14]=bitset<2>(1);
+    //         else if(table[lsb14]==bitset<2>(3)) table[lsb14]=bitset<2>(2);
+    //     }
+
+    //     int val=(int)(bhr.to_ulong());
+
+    //     if(taken)
+    //     {
+    //         if(bhrTable[val]==bitset<2>(0)) bhrTable[val]=bitset<2>(1);
+    //         else if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(2);
+    //         else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(3);
+    //     }
+    //     else
+    //     {
+    //         if(bhrTable[val]==bitset<2>(1)) bhrTable[val]=bitset<2>(0);
+    //         else if(bhrTable[val]==bitset<2>(2)) bhrTable[val]=bitset<2>(1);
+    //         else if(bhrTable[val]==bitset<2>(3)) bhrTable[val]=bitset<2>(2);
+    //     }
+
+    //     val=val%2;
+    //     val=val*2;
+    //     if(taken) val+=1;
+    //     bhr=bitset<2>(val);
+    // }
+
 };
 
 #endif
